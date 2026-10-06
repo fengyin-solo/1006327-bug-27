@@ -63,16 +63,52 @@ export function resetModule(key: string): PageResult {
 
 export function exportEntries(key: string): { filename: string; content: string } {
   const meta = moduleMeta(key)
-  const header = ['编号', ...meta.fields, '当前状态']
+  return exportRowsAsCsv(meta.name, meta.fields, listRows(key))
+}
+
+/** 按给定行序与附加列导出：页面怎么排、清单就怎么导，报表与明细对得上。 */
+export function exportRowsAsCsv(
+  name: string,
+  fields: string[],
+  rows: EntryRow[],
+  extraFields: string[] = [],
+): { filename: string; content: string } {
+  const header = ['编号', ...fields, ...extraFields, '当前状态']
   const lines = [header.join(',')]
-  for (const row of listRows(key)) {
-    lines.push([row.id, ...meta.fields.map((field) => row[field] ?? ''), row.status].join(','))
+  for (const row of rows) {
+    const cells = [
+      row.id,
+      ...fields.map((field) => row[field] ?? ''),
+      ...extraFields.map((field) => row[field] ?? ''),
+      row.status,
+    ]
+    lines.push(cells.map(csvEscape).join(','))
   }
-  return { filename: `${meta.name}-清单.csv`, content: `\uFEFF${lines.join('\n')}` }
+  return { filename: `${name}-清单.csv`, content: `﻿${lines.join('\n')}` }
+}
+
+function csvEscape(value: unknown): string {
+  const text = String(value)
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
 export function downloadEntries(key: string): void {
   const { filename, content } = exportEntries(key)
+  downloadTextFile(filename, content)
+}
+
+/** 按自定义行序与附加列下载清单（用于检修页沉降联动待办的排序导出）。 */
+export function downloadRowsCsv(
+  name: string,
+  fields: string[],
+  rows: EntryRow[],
+  extraFields: string[] = [],
+): void {
+  const { filename, content } = exportRowsAsCsv(name, fields, rows, extraFields)
+  downloadTextFile(filename, content)
+}
+
+function downloadTextFile(filename: string, content: string): void {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')

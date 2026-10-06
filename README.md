@@ -69,3 +69,20 @@ npm run build
   `frontend/src/data/seed.ts`。
 - 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。
 - 想回到初始数据：清掉浏览器里 `urban-utility-tunnel:entries` 这一项，或调用 `resetModule(模块)`。
+
+## 结构沉降监测的统一口径
+
+沉降模块（页面、详情、导出、设施检修联动、运营概览待查台账）不走通用示例表，单独有一套
+领域层，全部读数来自同一份增量链重算结果：
+
+- `src/data/settlement-legacy.ts`：模拟老系统导入的存量成果（含合并条、三处分歧读数、缺项、重复提交）。
+- `src/data/settlement-engine.ts`：存量归一化 + 唯一口径重算。按监测断面分组沿「本次增量」链重算
+  累计沉降量；沉降速率 = 本次增量 ÷ 相邻观测间隔，不叠加；同一断面只聚合一次；争议以归档件为锚点；
+  合并条拆分、缺项补齐、重复退回都在这里落规则。
+- `src/data/settlement-report.ts`：断面汇总 + 观测明细 + 核对行的纯函数报表，重复导出逐字节一致，
+  支持总报表与单断面分组下载。
+- `src/api/settlement-service.ts`：断面列表、幂等登记、超限→检修待办联动、待查台账、下载。
+
+数据持久化在 `urban-utility-tunnel:settlement:v1`（通用表 `urban-utility-tunnel:entries` 里只镜像
+断面口径结果供概览统计）；沉降页「重置存量成果」可回到迁移后的初始状态。完整处理规则见沉降页
+「统一口径处理说明」与报表文件表头。
