@@ -63,10 +63,33 @@ export function resetModule(key: string): PageResult {
 
 export function exportEntries(key: string): { filename: string; content: string } {
   const meta = moduleMeta(key)
-  const header = ['编号', ...meta.fields, '当前状态']
+  // 跨模块同步进来的条目（如沉降超限待办）会带扩展字段，导出时一并列出，报表照页面条数走。
+  const extraFields = Array.from(
+    new Set(
+      listRows(key).flatMap((row) =>
+        Object.keys(row).filter(
+          (field) => !['id', 'status', 'pending', 'abnormal', ...meta.fields].includes(field),
+        ),
+      ),
+    ),
+  )
+  const header = ['编号', ...meta.fields, ...extraFields, '当前状态']
   const lines = [header.join(',')]
+  const escapeCell = (value: unknown): string => {
+    const text = value === null || value === undefined ? '' : String(value)
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+  }
   for (const row of listRows(key)) {
-    lines.push([row.id, ...meta.fields.map((field) => row[field] ?? ''), row.status].join(','))
+    lines.push(
+      [
+        row.id,
+        ...meta.fields.map((field) => row[field] ?? ''),
+        ...extraFields.map((field) => row[field] ?? ''),
+        row.status,
+      ]
+        .map(escapeCell)
+        .join(','),
+    )
   }
   return { filename: `${meta.name}-清单.csv`, content: `\uFEFF${lines.join('\n')}` }
 }

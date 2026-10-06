@@ -69,3 +69,29 @@ npm run build
   `frontend/src/data/seed.ts`。
 - 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。
 - 想回到初始数据：清掉浏览器里 `urban-utility-tunnel:entries` 这一项，或调用 `resetModule(模块)`。
+
+## 结构沉降监测的口径与跨模块联动
+
+结构沉降监测（`frontend/src/settlement/`）在通用 CRUD 之外有独立的领域层，解决
+「导出与页面对不上、同一断面被重复叠加、重导残留旧差值」等问题：
+
+- **统一口径**：累计沉降量＝首次观测高程−最新观测高程（单次相减），沉降速率＝最近两个不同观测日的
+  区间速率；列表、详情、导出、待查台账、设施检修同步都取自 `canonical.ts` 同一份计算结果。
+- **按断面分组导出**：一个断面一行成果（另存条数＝页面条数），CSV 分断面成果/观测明细分组/提交受理/
+  处理说明/核对五段，纯函数生成、不含时间戳，重导字节一致并附校验码。
+- **预警联动**：超限断面自动 upsert 为设施检修待办（`MAIN-SETT-<断面号>`，一断面一条），
+  按最新累计沉降值降序重排；判定正常自动关闭待办。
+- **存量回填**：并记两次观测按上午/下午拆成两条；缺高程按相邻观测线性内插（无法内插则留空转待查）；
+  历史争议以归档件数值为准；无登记时间取最早动作日志推定。
+- **重复提交**：断面＋日期＋高程为同一笔指纹，只认第一次落库，重复笔整笔退回并留痕。
+- **异常台账**：新增「沉降待查台账」页面（`/settlement-ledger`），超限/重复/并记/缺项/争议全部回写。
+
+完整规则见 [`frontend/src/settlement/SETTLEMENT_RULES.md`](frontend/src/settlement/SETTLEMENT_RULES.md)。
+口径核对脚本：
+
+```bash
+cd frontend
+npm run verify:settlement
+```
+
+沉降数据单独持久化在浏览器 `urban-utility-tunnel:settlement-v1`；清掉该键后刷新会重新回填示例。
